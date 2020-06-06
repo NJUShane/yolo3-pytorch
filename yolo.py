@@ -16,10 +16,10 @@ from utils.utils import non_max_suppression, bbox_iou, DecodeBox,letterbox_image
 
 class YOLO(object):
     _defaults = {
-        "model_path": 'model_data/yolo_weights.pth',
-        "classes_path": 'model_data/coco_classes.txt',
+        "model_path": 'logs/Epoch6-Total_Loss9.8760-Val_Loss9.5476.pth',
+        "classes_path": 'model_data/cartoon_classes.txt',
         "model_image_size" : (416, 416, 3),
-        "confidence": 0.5,
+        "confidence": 0.3,
         "cuda": True
     }
 
@@ -163,3 +163,71 @@ class YOLO(object):
             del draw
         return image
 
+    # ---------------------------------------------------#
+    #   检测图片,并返回候选框的坐标字符串
+    # ---------------------------------------------------#
+    def generate_box(self, image):
+        image_shape = np.array(np.shape(image)[0:2])
+
+        crop_img = np.array(letterbox_image(image, (self.model_image_size[0], self.model_image_size[1])))
+        photo = np.array(crop_img, dtype=np.float32)
+        photo /= 255.0
+        photo = np.transpose(photo, (2, 0, 1))
+        photo = photo.astype(np.float32)
+        images = []
+        images.append(photo)
+
+        images = np.asarray(images)
+        images = torch.from_numpy(images)
+        if self.cuda:
+            images = images.cuda()
+
+        with torch.no_grad():
+            outputs = self.net(images)
+            output_list = []
+            for i in range(3):
+                output_list.append(self.yolo_decodes[i](outputs[i]))
+            output = torch.cat(output_list, 1)
+            batch_detections = non_max_suppression(output, self.config["yolo"]["classes"],
+                                                   conf_thres=self.confidence,
+                                                   nms_thres=0.3)
+        try:
+            batch_detections = batch_detections[0].cpu().numpy()
+        except:
+            boxlist = []
+            return boxlist
+        top_index = batch_detections[:, 4] * batch_detections[:, 5] > self.confidence
+        top_conf = batch_detections[top_index, 4] * batch_detections[top_index, 5]
+        top_label = np.array(batch_detections[top_index, -1], np.int32)
+        top_bboxes = np.array(batch_detections[top_index, :4])
+        top_xmin, top_ymin, top_xmax, top_ymax = np.expand_dims(top_bboxes[:, 0], -1), np.expand_dims(top_bboxes[:, 1],
+                                                                                                      -1), np.expand_dims(
+            top_bboxes[:, 2], -1), np.expand_dims(top_bboxes[:, 3], -1)
+
+        # 去掉灰条
+        boxes = yolo_correct_boxes(top_ymin, top_xmin, top_ymax, top_xmax,
+                                   np.array([self.model_image_size[0], self.model_image_size[1]]), image_shape)
+
+        font = ImageFont.truetype(font='model_data/simhei.ttf',
+                                  size=np.floor(3e-2 * np.shape(image)[1] + 0.5).astype('int32'))
+
+        thickness = (np.shape(image)[0] + np.shape(image)[1]) // self.model_image_size[0]
+
+        boxlist = []
+        for i, c in enumerate(top_label):
+            top, left, bottom, right = boxes[i]
+            top = top - 5
+            left = left - 5
+            bottom = bottom + 5
+            right = right + 5
+
+            top = max(0, np.floor(top + 0.5).astype('int32'))
+            left = max(0, np.floor(left + 0.5).astype('int32'))
+            bottom = min(np.shape(image)[0], np.floor(bottom + 0.5).astype('int32'))
+            right = min(np.shape(image)[1], np.floor(right + 0.5).astype('int32'))
+
+            box_str = str(left) + ',' + str(top) + ',' + str(right) + ',' + str(bottom)
+            boxlist.append(box_str)
+
+
+        return boxlist
