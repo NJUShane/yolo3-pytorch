@@ -16,7 +16,7 @@ from utils.utils import non_max_suppression, bbox_iou, DecodeBox,letterbox_image
 
 class YOLO(object):
     _defaults = {
-        "model_path": 'logs/Epoch6-Total_Loss9.8760-Val_Loss9.5476.pth',
+        "model_path": '，model_data/final_model.pth',
         "classes_path": 'model_data/cartoon_classes.txt',
         "model_image_size" : (416, 416, 3),
         "confidence": 0.3,

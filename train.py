@@ -80,10 +80,8 @@ if __name__ == "__main__":
 
     print('Loading weights into state dict...')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    #device = torch.device('cpu')
     model_dict = model.state_dict()
     pretrained_dict = torch.load("model_data/yolo_weights.pth", map_location=device)
-    #pretrained_dict = torch.load("logs/Epoch6-Total_Loss9.8760-Val_Loss9.5476.pth", map_location=device)
     pretrained_dict = {k: v for k, v in pretrained_dict.items() if np.shape(model_dict[k]) ==  np.shape(v)}
     model_dict.update(pretrained_dict)
     model.load_state_dict(model_dict)
@@ -140,27 +138,3 @@ if __name__ == "__main__":
             fit_ont_epoch(net,yolo_losses,epoch,epoch_size,epoch_size_val,gen,gen_val,Freeze_Epoch,Cuda)
             lr_scheduler.step()
             
-    if True:
-        lr = 1e-4
-        Batch_size = 2
-        Freeze_Epoch = 6
-        Unfreeze_Epoch = 12
-
-        optimizer = optim.Adam(net.parameters(),lr)
-        lr_scheduler = optim.lr_scheduler.StepLR(optimizer,step_size=1,gamma=0.95)
-        gen = Generator(Batch_size, lines[:num_train],
-                        (Config["img_h"], Config["img_w"])).generate()
-        gen_val = Generator(Batch_size, lines[num_train:],
-                        (Config["img_h"], Config["img_w"])).generate()
-                        
-        epoch_size = num_train//Batch_size
-        epoch_size_val = num_val//Batch_size
-        #------------------------------------#
-        #   解冻后训练
-        #------------------------------------#
-        for param in model.backbone.parameters():
-            param.requires_grad = True
-
-        for epoch in range(Freeze_Epoch,Unfreeze_Epoch):
-            fit_ont_epoch(net,yolo_losses,epoch,epoch_size,epoch_size_val,gen,gen_val,Unfreeze_Epoch,Cuda)
-            lr_scheduler.step()
